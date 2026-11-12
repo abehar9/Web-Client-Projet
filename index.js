@@ -1,0 +1,1 @@
+console.log('Bonjour, le projet Node.js fonctionne !');
