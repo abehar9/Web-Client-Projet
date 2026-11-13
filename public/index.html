@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Bomberman </title>
+    <style>
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #222; }
+    </style>
+    <!-- Import de Phaser -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+    <script>
+        const socket = io();
+
+        // Définition de la scène de jeu
+        class GameScene extends Phaser.Scene {
+            constructor() {
+                super('GameScene');
+                this.tileSize = 50;
+            }
+
+            preload() {
+                
+            }
+
+            create() {
+                // Écoute de la grille envoyée par ton serveur Node.js
+                socket.on('initGrid', (grid) => {
+                    this.drawGrid(grid);
+                });
+            }
+
+            drawGrid(grid) {
+                for (let y = 0; y < grid.length; y++) {
+                    for (let x = 0; x < grid[y].length; x++) {
+                        const cell = grid[y][x];
+                        let color = 0x2e8b57; // Sol par défaut (Vert)
+
+                        if (cell === 1) color = 0x555555;      // Mur incassable (Gris)
+                        else if (cell === 2) color = 0xc87d32; // Mur cassable (Marron)
+
+                        // Dessin d'un carré avec l'API graphique de Phaser
+                        const rect = this.add.rectangle(
+                            x * this.tileSize + this.tileSize / 2, 
+                            y * this.tileSize + this.tileSize / 2, 
+                            this.tileSize, 
+                            this.tileSize, 
+                            color
+                        );
+                        rect.setStrokeStyle(1, 0x111111); // Bordure de la case
+                    }
+                }
+            }
+        }
+
+        // Configuration globale du jeu Phaser
+        const config = {
+            type: Phaser.AUTO,
+            width: 850,  // 17 * 50
+            height: 650, // 13 * 50
+            backgroundColor: '#222222',
+            scene: GameScene
+        };
+
+        // Lancement du jeu
+        const game = new Phaser.Game(config);
+    </script>
+</body>
+</html>
