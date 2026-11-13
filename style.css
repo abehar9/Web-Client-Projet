@@ -1,0 +1,94 @@
+/* header */
+header{
+    background-color: var(--header-color); ;
+}
+header ul{
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    color: var(--header-text-color);
+}
+
+header ul li{
+    margin: 0;
+    padding: 8px;
+    border: 1px solid var(--header-border-color);
+}
+
+header ul li a{
+    text-decoration: none;
+    color: var(--header-text-color);
+}
+
+body{
+    background-color: #f2f3ff ;
+    margin: 0;
+    padding: 0;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+html {
+  display: grid;
+  min-height: 100%;
+}
+
+main{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    height: 100%;
+    background-color: var(--main-background-color); ;
+}
+
+li{
+    list-style-type: none;
+}
+
+
+
+.grille{
+    display: grid;
+    grid-template-columns: repeat(13, 1fr);
+    grid-template-rows: repeat(13, 1fr);
+    background-color: var(--grille-background-color); ;
+    aspect-ratio: 1/1;
+    width: 100%;
+    max-width: 800px;
+    justify-content: center;
+    align-items: center;
+    gap: 2px; 
+    /*  a retirer au choix*/
+}
+
+.case{
+    background-color: var(--case-color);
+    height: 100%;
+    width: 100%;
+    display: inline-block;
+    padding: 0;
+    margin: 0;
+}
+
+.case-border{
+    background-color: var(--case-border-color); ;
+    height: 100%;
+    width: 100%;
+    display: inline-block;
+    padding: 0;
+    margin: 0;
+}
+
+
+/* couleurs à changer ici, sachant que les blocks auront leurs images */
+:root { 
+    --header-color: #cfd2f3;
+    --header-border-color: #000;
+    --header-text-color: #0a1aa8;
+    --main-background-color: #cccee2;
+    --grille-background-color: #7a7fa7;
+    --case-color: #abcfc7;
+    --case-border-color: #a183b9;
+}
