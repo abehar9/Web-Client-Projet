@@ -2,15 +2,24 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Bomberman </title>
-    <style>
-        body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #222; }
-    </style>
+    <title>Bomberman</title>
+    <link rel="stylesheet" href="style.css">
     <!-- Import de Phaser -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
+    <header>
+        <ul>
+            <li><a href="menu.html">Menu</a></li>
+            <li>temps : 2:00</li>
+            <li>score : 0</li>
+        </ul>
+    </header>
+    <main>
+        <!-- Le jeu Phaser s'insérera ici -->
+        <div id="game-container"></div>
+    </main>
 
     <script>
         const socket = io();
@@ -19,11 +28,7 @@
         class GameScene extends Phaser.Scene {
             constructor() {
                 super('GameScene');
-                this.tileSize = 50;
-            }
-
-            preload() {
-                
+                this.tileSize = 45; // Ajusté pour s'intégrer harmonieusement dans la page
             }
 
             create() {
@@ -37,35 +42,36 @@
                 for (let y = 0; y < grid.length; y++) {
                     for (let x = 0; x < grid[y].length; x++) {
                         const cell = grid[y][x];
-                        let color = 0x2e8b57; // Sol par défaut (Vert)
+                        
+                        // Couleurs basées sur les variables CSS de ton style.css
+                        // Sol : #abcfc7 | Mur cassable : #a183b9 | Mur incassable : #7a7fa7
+                        let color = 0xabcfc7; 
 
-                        if (cell === 1) color = 0x555555;      // Mur incassable (Gris)
-                        else if (cell === 2) color = 0xc87d32; // Mur cassable (Marron)
+                        if (cell === 1) color = 0x7a7fa7;      // Mur incassable
+                        else if (cell === 2) color = 0xa183b9; // Mur cassable
 
-                        // Dessin d'un carré avec l'API graphique de Phaser
                         const rect = this.add.rectangle(
                             x * this.tileSize + this.tileSize / 2, 
                             y * this.tileSize + this.tileSize / 2, 
-                            this.tileSize, 
-                            this.tileSize, 
+                            this.tileSize - 2, // Petit espace simulant le gap du CSS
+                            this.tileSize - 2, 
                             color
                         );
-                        rect.setStrokeStyle(1, 0x111111); // Bordure de la case
                     }
                 }
             }
         }
 
-        // Configuration globale du jeu Phaser
+        // Configuration globale du jeu Phaser adaptée à une grille de 13x13 (ou 17x13)
         const config = {
             type: Phaser.AUTO,
-            width: 850,  // 17 * 50
-            height: 650, // 13 * 50
-            backgroundColor: '#222222',
+            width: 13 * 45,  // Largeur totale calculée dynamiquement
+            height: 13 * 45, // Hauteur totale
+            parent: 'game-container',
+            backgroundColor: '#7a7fa7', // Correspond à --grille-background-color
             scene: GameScene
         };
 
-        // Lancement du jeu
         const game = new Phaser.Game(config);
     </script>
 </body>

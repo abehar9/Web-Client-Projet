@@ -11,7 +11,7 @@ const io = new Server(server);
 app.use(express.static('public'));
 
 // Génération de la grille de la partie
-const gameGrid = createGrid(17, 13);
+const gameGrid = createGrid(13, 13);
 
 io.on('connection', (socket) => {
     console.log(`Joueur connecté : ${socket.id}`);
