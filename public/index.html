@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Bomberman</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Import de Phaser -->
+    <!-- Import de Phaser et Socket.io -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 </head>
@@ -17,35 +17,69 @@
         </ul>
     </header>
     <main>
-        <!-- Le jeu Phaser s'insérera ici -->
+        <!-- Conteneur d'affichage du canvas Phaser -->
         <div id="game-container"></div>
     </main>
 
     <script>
         const socket = io();
 
-        // Définition de la scène de jeu
+        // Définition de la scène principale du jeu
         class GameScene extends Phaser.Scene {
             constructor() {
                 super('GameScene');
-                this.tileSize = 45; // Ajusté pour s'intégrer harmonieusement dans la page
+                this.tileSize = 45;
+                this.playerSprites = {}; 
+            }
+
+            preload() {
+                // Chargement des ressources graphiques du personnage
+                this.load.image('floraFront', 'Sprite_Characters/Flora/FloraFrontStatic.png');
             }
 
             create() {
-                // Écoute de la grille envoyée par ton serveur Node.js
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.moveTimer = 0;
+
+                // Écoute de la grille initiale envoyée par le serveur
                 socket.on('initGrid', (grid) => {
                     this.drawGrid(grid);
                 });
+
+                // Réception de la liste des joueurs déjà présents
+                socket.on('currentPlayers', (serverPlayers) => {
+                    for (let id in serverPlayers) {
+                        this.createOrUpdatePlayer(serverPlayers[id]);
+                    }
+                });
+
+                // Arrivée d'un nouveau joueur en cours de partie
+                socket.on('newPlayer', (player) => {
+                    this.createOrUpdatePlayer(player);
+                });
+
+                // Mise à jour de la position d'un joueur en mouvement
+                socket.on('updatePlayerPosition', (player) => {
+                    this.createOrUpdatePlayer(player);
+                });
+
+                // Suppression du sprite d'un joueur déconnecté
+                socket.on('removePlayer', (id) => {
+                    if (this.playerSprites[id]) {
+                        this.playerSprites[id].destroy();
+                        delete this.playerSprites[id];
+                    }
+                });
+
+                // Demande des données de jeu une fois que les écouteurs sont prêts
+                socket.emit('requestGameData');
             }
 
             drawGrid(grid) {
                 for (let y = 0; y < grid.length; y++) {
                     for (let x = 0; x < grid[y].length; x++) {
                         const cell = grid[y][x];
-                        
-                        // Couleurs basées sur les variables CSS de ton style.css
-                        // Sol : #abcfc7 | Mur cassable : #a183b9 | Mur incassable : #7a7fa7
-                        let color = 0xabcfc7; 
+                        let color = 0xabcfc7; // Sol par défaut
 
                         if (cell === 1) color = 0x7a7fa7;      // Mur incassable
                         else if (cell === 2) color = 0xa183b9; // Mur cassable
@@ -53,22 +87,58 @@
                         const rect = this.add.rectangle(
                             x * this.tileSize + this.tileSize / 2, 
                             y * this.tileSize + this.tileSize / 2, 
-                            this.tileSize - 2, // Petit espace simulant le gap du CSS
-                            this.tileSize - 2, 
+                            this.tileSize, 
+                            this.tileSize, 
                             color
                         );
+                        rect.setStrokeStyle(1, 0x5a5f87);
                     }
+                }
+            }
+
+            update(time) {
+                // Gestion des contrôles clavier avec limitation de fréquence
+                if (time > this.moveTimer) {
+                    let direction = null;
+
+                    if (this.cursors.left.isDown) direction = 'left';
+                    else if (this.cursors.right.isDown) direction = 'right';
+                    else if (this.cursors.up.isDown) direction = 'up';
+                    else if (this.cursors.down.isDown) direction = 'down';
+
+                    if (direction) {
+                        socket.emit('playerMove', direction);
+                        this.moveTimer = time + 150;
+                    }
+                }
+            }
+
+            createOrUpdatePlayer(player) {
+                if (this.playerSprites[player.id]) {
+                    // Met à jour la position si le sprite existe déjà
+                    this.playerSprites[player.id].x = player.x * this.tileSize + this.tileSize / 2;
+                    this.playerSprites[player.id].y = player.y * this.tileSize + this.tileSize / 2;
+                } else {
+                    // Crée le sprite du joueur s'il n'existe pas encore
+                    const pSprite = this.add.image(
+                        player.x * this.tileSize + this.tileSize / 2,
+                        player.y * this.tileSize + this.tileSize / 2,
+                        'floraFront'
+                    );
+                    pSprite.setDisplaySize(this.tileSize - 10, this.tileSize - 10);
+                    pSprite.setDepth(10); // S'assure que le joueur s'affiche par-dessus la grille
+                    this.playerSprites[player.id] = pSprite;
                 }
             }
         }
 
-        // Configuration globale du jeu Phaser adaptée à une grille de 13x13 (ou 17x13)
+        // Configuration globale de l'instance Phaser
         const config = {
             type: Phaser.AUTO,
-            width: 13 * 45,  // Largeur totale calculée dynamiquement
-            height: 13 * 45, // Hauteur totale
+            width: 13 * 45,
+            height: 13 * 45,
             parent: 'game-container',
-            backgroundColor: '#7a7fa7', // Correspond à --grille-background-color
+            backgroundColor: '#7a7fa7',
             scene: GameScene
         };
 
