@@ -34,7 +34,11 @@
 
             preload() {
                 // Chargement des ressources graphiques du personnage
-                this.load.image('floraFront', 'Sprite_Characters/Flora/FloraFrontStatic.png');
+                this.load.image('flora_back', '/Sprite_Characters/Flora/FloraBackStatic.png');
+                this.load.image('flora_front', '/Sprite_Characters/Flora/FloraFrontStatic.png');
+                this.load.image('flora_left', '/Sprite_Characters/Flora/FloraLeftStatic.png');
+                this.load.image('flora_right', '/Sprite_Characters/Flora/FloraRightStatic.png');
+                
             }
 
             create() {
@@ -96,6 +100,26 @@
                 }
             }
 
+            addPlayer(playerInfo, isLocal) {
+                const x = playerInfo.x * this.tileSize + this.tileSize / 2;
+                const y = playerInfo.y * this.tileSize + this.tileSize / 2;
+
+                // Use sprite instead of shape, defaulting to front view
+                const playerSprite = this.add.sprite(x, y, 'flora_front');
+                playerSprite.setDisplaySize(this.tileSize - 5, this.tileSize - 5);
+
+                if (isLocal) {
+                    this.localPlayer = { 
+                        sprite: playerSprite, 
+                        gridX: playerInfo.x, 
+                        gridY: playerInfo.y 
+                    };
+                } else {
+                    this.otherPlayers[playerInfo.id] = { sprite: playerSprite };
+                }
+            }
+
+
             update(time) {
                 // Gestion des contrôles clavier avec limitation de fréquence
                 if (time > this.moveTimer) {
@@ -114,21 +138,42 @@
             }
 
             createOrUpdatePlayer(player) {
+                const targetX = player.x * this.tileSize + this.tileSize / 2;
+                const targetY = player.y * this.tileSize + this.tileSize / 2;
+                const isLocal = (player.id === socket.id);
+
                 if (this.playerSprites[player.id]) {
-                    // Met à jour la position si le sprite existe déjà
-                    this.playerSprites[player.id].x = player.x * this.tileSize + this.tileSize / 2;
-                    this.playerSprites[player.id].y = player.y * this.tileSize + this.tileSize / 2;
+                    // Update position if sprite already exists
+                    const sprite = this.playerSprites[player.id];
+                    sprite.x = targetX;
+                    sprite.y = targetY;
+
+                    // Update direction texture if provided by server
+                    if (player.direction) {
+                        this.updatePlayerDirection(sprite, player.direction);
+                    }
+
                 } else {
-                    // Crée le sprite du joueur s'il n'existe pas encore
-                    const pSprite = this.add.image(
-                        player.x * this.tileSize + this.tileSize / 2,
-                        player.y * this.tileSize + this.tileSize / 2,
-                        'floraFront'
-                    );
+                    // Create new sprite (using correct key 'flora_front')
+                    const pSprite = this.add.sprite(targetX, targetY, 'flora_front');
                     pSprite.setDisplaySize(this.tileSize - 10, this.tileSize - 10);
-                    pSprite.setDepth(10); // S'assure que le joueur s'affiche par-dessus la grille
+                    pSprite.setDepth(10); // Ensure player renders above the grid
+
+                    if (isLocal) {
+                        this.localPlayer = pSprite;
+                    }
+
                     this.playerSprites[player.id] = pSprite;
                 }
+            }
+
+            // Direction helper method
+            updatePlayerDirection(sprite, direction) {
+                console.log("Changing direction to:", direction);
+                if (direction === 'up') sprite.setTexture('flora_back');
+                else if (direction === 'down') sprite.setTexture('flora_front');
+                else if (direction === 'left') sprite.setTexture('flora_left');
+                else if (direction === 'right') sprite.setTexture('flora_right');
             }
         }
 

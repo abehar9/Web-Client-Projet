@@ -12,14 +12,29 @@ const io = new Server(server);
 app.use(express.static('public'));
 
 // Génération de la grille de jeu initiale
-const gameGrid = createGrid(13, 13);
+
+const GRID_WIDTH = 13;
+const GRID_HEIGHT = 13;
+const gameGrid = createGrid(GRID_WIDTH, GRID_HEIGHT);
 const players = {}; 
 
+// Define the 4 classic Bomberman corner spawn points
+const spawnPoints = [
+    { x: 1, y: 1 },                         // Top-Left
+    { x: GRID_WIDTH - 2, y: GRID_HEIGHT - 2 }, // Bottom-Right (11, 11)
+    { x: GRID_WIDTH - 2, y: 1 },             // Top-Right (11, 1)
+    { x: 1, y: GRID_HEIGHT - 2 }             // Bottom-Left (1, 11)
+];
 io.on('connection', (socket) => {
     console.log(`Joueur connecté : ${socket.id}`);
     
     // Initialisation du joueur à sa position de départ
-    players[socket.id] = new Player(socket.id, 1, 1);
+    // Determine the next spawn point based on the number of connected players
+    const spawnIndex = Object.keys(players).length % spawnPoints.length;
+    const spawn = spawnPoints[spawnIndex];
+
+    // Initialisation du joueur à sa position de départ unique
+    players[socket.id] = new Player(socket.id, spawn.x, spawn.y);
 
     // Informe les autres participants de l'arrivée d'un nouveau joueur
     socket.broadcast.emit('newPlayer', players[socket.id]);
@@ -51,6 +66,7 @@ io.on('connection', (socket) => {
         ) {
             player.x = newX;
             player.y = newY;
+            player.direction = direction;
             io.emit('updatePlayerPosition', player);
         }
     });
