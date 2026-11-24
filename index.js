@@ -17,6 +17,7 @@ const GRID_WIDTH = 13;
 const GRID_HEIGHT = 13;
 const gameGrid = createGrid(GRID_WIDTH, GRID_HEIGHT);
 const players = {}; 
+const bombs = {}; // key: `${gridX},${gridY}`
 
 // Define the 4 classic Bomberman corner spawn points
 const spawnPoints = [
@@ -25,16 +26,32 @@ const spawnPoints = [
     { x: GRID_WIDTH - 2, y: 1 },             // Top-Right (11, 1)
     { x: 1, y: GRID_HEIGHT - 2 }             // Bottom-Left (1, 11)
 ];
+
+const MAX_PLAYERS = spawnPoints.length;
 io.on('connection', (socket) => {
     console.log(`Joueur connecté : ${socket.id}`);
+
+    if (Object.keys(players).length >= MAX_PLAYERS) {
+        socket.emit('roomFull');
+        socket.disconnect(true);
+        return;
+    }
     
     // Initialisation du joueur à sa position de départ
     // Determine the next spawn point based on the number of connected players
-    const spawnIndex = Object.keys(players).length % spawnPoints.length;
-    const spawn = spawnPoints[spawnIndex];
+    const spawnIndex = Object.keys(players).length % spawnPoints.length ;
 
-    // Initialisation du joueur à sa position de départ unique
-    players[socket.id] = new Player(socket.id, spawn.x, spawn.y);
+    const usedNums = new Set(Object.values(players).map(p => p.num));
+    let playerNum = 0;
+    while (usedNums.has(playerNum) && playerNum < spawnPoints.length) {
+        playerNum++;
+    }
+    
+    playerNum = playerNum % spawnPoints.length;
+
+    console.log("spawnIndex: ", spawnIndex)
+    const spawn = spawnPoints[spawnIndex];
+    players[socket.id] = new Player(socket.id, spawn.x, spawn.y, playerNum);
 
     // Informe les autres participants de l'arrivée d'un nouveau joueur
     socket.broadcast.emit('newPlayer', players[socket.id]);
@@ -49,6 +66,7 @@ io.on('connection', (socket) => {
     socket.on('playerMove', (direction) => {
         const player = players[socket.id];
         if (!player) return;
+
 
         let newX = player.x;
         let newY = player.y;
@@ -76,6 +94,82 @@ io.on('connection', (socket) => {
         console.log(`Joueur déconnecté : ${socket.id}`);
         delete players[socket.id];
         io.emit('removePlayer', socket.id);
+    });
+
+
+    socket.on('placeBomb', () => {
+        const player = players[socket.id];
+        if (!player) return;
+
+        // 1. Check player's active bomb limit
+        if (player.activeBombs >= player.maxBombs) return;
+
+        // 2. Snap to current grid tile and prevent stacking two bombs on one tile
+        const bx = Math.round(player.x);
+        const by = Math.round(player.y);
+        const key = `${bx},${by}`;
+        if (bombs[key]) return;
+
+        // 3. Create bomb and broadcast to all clients
+        player.activeBombs++;
+        const bomb = { id: key, ownerId: player.id, x: bx, y: by, range: player.bombRange };
+        bombs[key] = bomb;
+        io.emit('bombPlaced', bomb);
+
+        // 4. Detonate after 3 seconds
+        setTimeout(() => {
+            delete bombs[key];
+            if (players[player.id]) {
+                players[player.id].activeBombs--;
+            }
+
+            // --- START: Scan blast & update gameGrid ---
+            const destroyedTiles = [];
+            const flames = [{ x: bx, y: by, kind: 'center', dir: null }];
+            const directions = [
+                { name: 'up', dx: 0, dy: -1 },
+                { name: 'down', dx: 0, dy: 1 },
+                { name: 'left', dx: -1, dy: 0 },
+                { name: 'right', dx: 1, dy: 0 }
+            ];
+
+            for (const { name, dx, dy } of directions) {
+                for (let step = 1; step <= bomb.range; step++) {
+                    const tx = bx + dx * step;
+                    const ty = by + dy * step;
+
+                    if (ty < 0 || ty >= gameGrid.length || tx < 0 || tx >= gameGrid[0].length) {
+                        break;
+                    }
+
+                    const tile = gameGrid[ty][tx];
+
+                    if (tile === 1) {
+                        break;
+                    }
+
+                    if (tile === 2) {
+                        gameGrid[ty][tx] = 0;
+                        destroyedTiles.push({ x: tx, y: ty, value: 0 });
+                        flames.push({ x: tx, y: ty, kind: 'end', dir: name });
+                        break;
+                    }
+
+                    const kind = step === bomb.range ? 'end' : 'side';
+                    flames.push({ x: tx, y: ty, kind, dir: name });
+                }
+            }
+            // --- END: Scan blast & update gameGrid ---
+
+            io.emit('bombExploded', {
+                id: key,
+                x: bx,
+                y: by,
+                range: bomb.range,
+                destroyedTiles,
+                flames
+            });
+        }, 3000);
     });
 });
 

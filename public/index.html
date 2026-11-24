@@ -34,10 +34,40 @@
 
             preload() {
                 // Chargement des ressources graphiques du personnage
+                //Flora
                 this.load.image('flora_back', '/Sprite_Characters/Flora/FloraBackStatic.png');
                 this.load.image('flora_front', '/Sprite_Characters/Flora/FloraFrontStatic.png');
                 this.load.image('flora_left', '/Sprite_Characters/Flora/FloraLeftStatic.png');
                 this.load.image('flora_right', '/Sprite_Characters/Flora/FloraRightStatic.png');
+
+                //Clover
+                this.load.image('clover_back', '/Sprite_Characters/Clover/CloverBackStatic.png');
+                this.load.image('clover_front', '/Sprite_Characters/Clover/CloverFrontStatic.png');
+                this.load.image('clover_left', '/Sprite_Characters/Clover/CloverLeftStatic.png');
+                this.load.image('clover_right', '/Sprite_Characters/Clover/CloverRightStatic.png');
+
+                //ivy
+                this.load.image('ivy_back', '/Sprite_Characters/Ivy/IvyBackStatic.png');
+                this.load.image('ivy_front', '/Sprite_Characters/Ivy/IvyFrontStatic.png');
+                this.load.image('ivy_left', '/Sprite_Characters/Ivy/IvyLeftStatic.png');
+                this.load.image('ivy_right', '/Sprite_Characters/Ivy/IvyRightStatic.png');
+
+                //Moon
+                this.load.image('moon_back', '/Sprite_Characters/Moon/MoonBackStatic.png');
+                this.load.image('moon_front', '/Sprite_Characters/Moon/MoonFrontStatic.png');
+                this.load.image('moon_left', '/Sprite_Characters/Moon/MoonLeftStatic.png');
+                this.load.image('moon_right', '/Sprite_Characters/Moon/MoonRightStatic.png');
+
+                //Bombs
+                this.load.image('bomb_normal', '/Sprite_Elements/BombNormal.png');
+                this.load.image('bomb_white', '/Sprite_Elements/BombWhite.png');
+                this.load.image('blocC_buisson1', '/Sprite_Elements/BlocC_buisson1.png');
+                this.load.image('explosion_center', '/Sprite_Elements/Explosion00.png');
+                this.load.image('explosion_side', '/Sprite_Elements/Explosion01.png');
+                this.load.image('explosion_end', '/Sprite_Elements/Explosion02.png');
+
+
+
                 
             }
 
@@ -75,53 +105,76 @@
                     }
                 });
 
+
+                // In create():
+                this.bombSprites = {};
+                this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+                this.bombSprites = {};
+                this.gridRects = [];
+
+                socket.on('bombPlaced', (bomb) => {
+                    const px = bomb.x * this.tileSize + this.tileSize / 2;
+                    const py = bomb.y * this.tileSize + this.tileSize / 2;
+
+                    const bSprite = this.add.sprite(px, py, 'bomb_normal');
+                    bSprite.setDisplaySize(this.tileSize - 12, this.tileSize - 12);
+                    bSprite.setDepth(5);
+                    this.bombSprites[bomb.id] = bSprite;
+
+                    let useWhite = false;
+                    const flashTimer = this.time.addEvent({
+                        delay: 200,
+                        loop: true,
+                        callback: () => {
+                            if (!bSprite || !bSprite.scene) return;
+                            useWhite = !useWhite;
+                            bSprite.setTexture(useWhite ? 'bomb_white' : 'bomb_normal');
+                        }
+                    });
+                    this.bombFlashTimers[bomb.id] = flashTimer;
+            
+                });
+
+
+                socket.on('bombExploded', (data) => {
+                    if (this.bombSprites[data.id]) {
+                        this.bombSprites[data.id].destroy();
+                        delete this.bombSprites[data.id];
+                    }
+
+
+                    if (data.destroyedTiles) {
+                        for (const tile of data.destroyedTiles) {
+                            const rect = this.gridRects[tile.y] && this.gridRects[tile.y][tile.x];
+                            if (rect) {
+                                rect.setFillStyle(this.getTileColor(tile.value));
+                            }
+                        }
+                    }
+
+                    this.spawnTimedFlames(data.flames, 450);
+                    this.spawnBuissonAtBomb(data.x, data.y, 450);
+
+                    if (this.bombFlashTimers[data.id]) {
+                        this.bombFlashTimers[data.id].remove(false);
+                        delete this.bombFlashTimers[data.id];
+                    }
+                });
+
                 // Demande des données de jeu une fois que les écouteurs sont prêts
                 socket.emit('requestGameData');
             }
 
-            drawGrid(grid) {
-                for (let y = 0; y < grid.length; y++) {
-                    for (let x = 0; x < grid[y].length; x++) {
-                        const cell = grid[y][x];
-                        let color = 0xabcfc7; // Sol par défaut
-
-                        if (cell === 1) color = 0x7a7fa7;      // Mur incassable
-                        else if (cell === 2) color = 0xa183b9; // Mur cassable
-
-                        const rect = this.add.rectangle(
-                            x * this.tileSize + this.tileSize / 2, 
-                            y * this.tileSize + this.tileSize / 2, 
-                            this.tileSize, 
-                            this.tileSize, 
-                            color
-                        );
-                        rect.setStrokeStyle(1, 0x5a5f87);
-                    }
-                }
-            }
-
-            addPlayer(playerInfo, isLocal) {
-                const x = playerInfo.x * this.tileSize + this.tileSize / 2;
-                const y = playerInfo.y * this.tileSize + this.tileSize / 2;
-
-                // Use sprite instead of shape, defaulting to front view
-                const playerSprite = this.add.sprite(x, y, 'flora_front');
-                playerSprite.setDisplaySize(this.tileSize - 5, this.tileSize - 5);
-
-                if (isLocal) {
-                    this.localPlayer = { 
-                        sprite: playerSprite, 
-                        gridX: playerInfo.x, 
-                        gridY: playerInfo.y 
-                    };
-                } else {
-                    this.otherPlayers[playerInfo.id] = { sprite: playerSprite };
-                }
-            }
+           
 
 
             update(time) {
                 // Gestion des contrôles clavier avec limitation de fréquence
+                        // In update():
+                if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+                    socket.emit('placeBomb');
+                }
+
                 if (time > this.moveTimer) {
                     let direction = null;
 
@@ -137,10 +190,111 @@
                 }
             }
 
+            drawGrid(grid) {
+                this.gridRects = [];
+
+                for (let y = 0; y < grid.length; y++) {
+                    this.gridRects[y] = [];
+
+                    for (let x = 0; x < grid[y].length; x++) {
+                        const cell = grid[y][x];
+                        const rect = this.add.rectangle(
+                            x * this.tileSize + this.tileSize / 2,
+                            y * this.tileSize + this.tileSize / 2,
+                            this.tileSize,
+                            this.tileSize,
+                            this.getTileColor(cell)
+                        );
+                        rect.setStrokeStyle(1, 0x5a5f87);
+                        this.gridRects[y][x] = rect;
+                    }
+                }
+            }
+
+            getTileColor(cell) {
+                if (cell === 1) return 0x7a7fa7;      // Mur incassable
+                if (cell === 2) return 0xa183b9; // Mur cassable
+                return 0xabcfc7;                   // Sol (0)
+            }
+
+            spawnTimedFlames(flames, duration = 450) {
+                if (!Array.isArray(flames)) return;
+
+                const spawnedSprites = [];
+
+                const endAngles = {
+                    left: 0,
+                    right: 180,
+                    up: 90,
+                    down: -90
+                };
+
+                for (const f of flames) {
+                    const px = f.x * this.tileSize + this.tileSize / 2;
+                    const py = f.y * this.tileSize + this.tileSize / 2;
+
+                    let textureKey = 'explosion_center';
+                    if (f.kind === 'side') textureKey = 'explosion_side';
+                    else if (f.kind === 'end') textureKey = 'explosion_end';
+
+                    const flameSprite = this.add.sprite(px, py, textureKey);
+                    flameSprite.setDisplaySize(this.tileSize, this.tileSize);
+                    flameSprite.setDepth(8);
+
+                    if (f.kind === 'side') {
+                        if (f.dir === 'up' || f.dir === 'down') {
+                            flameSprite.setAngle(90);
+                        } else {
+                            flameSprite.setAngle(0);
+                        }
+                    } else if (f.kind === 'end') {
+                        flameSprite.setAngle(endAngles[f.dir] ?? 0);
+                    }
+
+                    spawnedSprites.push(flameSprite);
+                }
+
+                this.tweens.add({
+                    targets: spawnedSprites,
+                    alpha: 0,
+                    duration: 180,
+                    delay: Math.max(0, duration - 180),
+                    onComplete: () => {
+                        for (const s of spawnedSprites) {
+                            if (s && s.scene) s.destroy();
+                        }
+                    }
+                });
+            }
+
+            spawnBuissonAtBomb(x, y, duration = 450) {
+                const px = x * this.tileSize + this.tileSize / 2;
+                const py = y * this.tileSize + this.tileSize / 2;
+
+                const bush = this.add.sprite(px, py, 'blocC_buisson1');
+                bush.setDisplaySize(this.tileSize - 4, this.tileSize - 4);
+                bush.setDepth(9); // Above the center flame (depth 8) so it is clearly visible
+
+                this.tweens.add({
+                    targets: bush,
+                    alpha: 0,
+                    duration: 180,
+                    delay: Math.max(0, duration - 180),
+                    onComplete: () => {
+                        if (bush && bush.scene) bush.destroy();
+                    }
+                });
+            }
+
             createOrUpdatePlayer(player) {
                 const targetX = player.x * this.tileSize + this.tileSize / 2;
                 const targetY = player.y * this.tileSize + this.tileSize / 2;
                 const isLocal = (player.id === socket.id);
+                const player_num = player.num
+
+                const NAMES = ['flora', 'clover', 'ivy', 'moon'];
+                const slotIndex = (typeof player.num === 'number' ? player.num : 0) % NAMES.length;
+                var charName = NAMES[slotIndex];
 
                 if (this.playerSprites[player.id]) {
                     // Update position if sprite already exists
@@ -155,9 +309,13 @@
 
                 } else {
                     // Create new sprite (using correct key 'flora_front')
-                    const pSprite = this.add.sprite(targetX, targetY, 'flora_front');
+
+                                                //get player number
+
+                    const pSprite = this.add.sprite(targetX, targetY, `${charName}_front`);
+                    pSprite.charName = charName;
                     pSprite.setDisplaySize(this.tileSize - 10, this.tileSize - 10);
-                    pSprite.setDepth(10); // Ensure player renders above the grid
+                    pSprite.setDepth(10);
 
                     if (isLocal) {
                         this.localPlayer = pSprite;
@@ -169,13 +327,23 @@
 
             // Direction helper method
             updatePlayerDirection(sprite, direction) {
+
+                ///charName not found!
+                const charName = sprite.charName;
                 console.log("Changing direction to:", direction);
-                if (direction === 'up') sprite.setTexture('flora_back');
-                else if (direction === 'down') sprite.setTexture('flora_front');
-                else if (direction === 'left') sprite.setTexture('flora_left');
-                else if (direction === 'right') sprite.setTexture('flora_right');
+                console.log("Name:", charName );
+                console.log(`${charName}_back`);
+
+
+              
+                if (direction === 'up') sprite.setTexture(`${charName}_back`);
+                else if (direction === 'down') sprite.setTexture(`${charName}_front`);
+                else if (direction === 'left') sprite.setTexture(`${charName}_left`);
+                else if (direction === 'right') sprite.setTexture(`${charName}_right`);
+             
             }
         }
+
 
         // Configuration globale de l'instance Phaser
         const config = {
