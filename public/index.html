@@ -62,6 +62,8 @@
                 //Bombs
                 this.load.image('bomb_normal', '/Sprite_Elements/BombNormal.png');
                 this.load.image('bomb_white', '/Sprite_Elements/BombWhite.png');
+                this.load.image('blocC_buisson0', '/Sprite_Elements/BlocC_buisson0.png');
+                this.load.image('blocS_pierre', '/Sprite_Elements/BlocS_pierre.png');
                 this.load.image('blocC_buisson1', '/Sprite_Elements/BlocC_buisson1.png');
                 this.load.image('explosion_center', '/Sprite_Elements/Explosion00.png');
                 this.load.image('explosion_side', '/Sprite_Elements/Explosion01.png');
@@ -150,6 +152,11 @@
                             if (rect) {
                                 rect.setFillStyle(this.getTileColor(tile.value));
                             }
+                            const blockSprite = this.gridSprites[tile.y] && this.gridSprites[tile.y][tile.x];
+                            if (blockSprite) {
+                                blockSprite.destroy();
+                                this.gridSprites[tile.y][tile.x] = null;
+                            }
                         }
                     }
 
@@ -193,9 +200,11 @@
 
             drawGrid(grid) {
                 this.gridRects = [];
+                this.gridSprites = [];
 
                 for (let y = 0; y < grid.length; y++) {
                     this.gridRects[y] = [];
+                    this.gridSprites[y] = [];
 
                     for (let x = 0; x < grid[y].length; x++) {
                         const cell = grid[y][x];
@@ -208,13 +217,28 @@
                         );
                         rect.setStrokeStyle(1, 0x5a5f87);
                         this.gridRects[y][x] = rect;
+
+                        // Sprite par-dessus la case selon son type
+                        let key = null;
+                        if (cell === 2) key = 'blocC_buisson0';   // bloc cassable (violet)
+                        else if (cell === 1) key = 'blocS_pierre'; // tous les murs incassables : bordure + piliers
+                        if (key) {
+                            const s = this.add.sprite(
+                                x * this.tileSize + this.tileSize / 2,
+                                y * this.tileSize + this.tileSize / 2,
+                                key
+                            );
+                            s.setDisplaySize(this.tileSize, this.tileSize);
+                            s.setDepth(1);
+                            this.gridSprites[y][x] = s;
+                        }
                     }
                 }
             }
 
             getTileColor(cell) {
                 if (cell === 1) return 0x7a7fa7;      // Mur incassable
-                if (cell === 2) return 0xa183b9; // Mur cassable
+                if (cell === 2) return 0xabcfc7; // Mur cassable
                 return 0xabcfc7;                   // Sol (0)
             }
 
