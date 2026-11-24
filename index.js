@@ -3,7 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { createGrid } = require('./game/game.js'); 
 const Player = require('./game/player.js'); 
-
+const MOVE_DELAY = 150;
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
@@ -50,6 +50,10 @@ io.on('connection', (socket) => {
         const player = players[socket.id];
         if (!player) return;
 
+        // Anti-spam : vitesse limitée, avec 10 ms de tolérance pour la gigue réseau
+        const now = Date.now();
+        if (player.lastMove && now - player.lastMove < MOVE_DELAY - 10) return;
+
         let newX = player.x;
         let newY = player.y;
 
@@ -58,7 +62,6 @@ io.on('connection', (socket) => {
         else if (direction === 'left') newX--;
         else if (direction === 'right') newX++;
 
-        // Vérification des limites de la grille et si la case est libre (0)
         if (
             newY >= 0 && newY < gameGrid.length &&
             newX >= 0 && newX < gameGrid[0].length &&
@@ -67,6 +70,7 @@ io.on('connection', (socket) => {
             player.x = newX;
             player.y = newY;
             player.direction = direction;
+            player.lastMove = now;
             io.emit('updatePlayerPosition', player);
         }
     });

@@ -30,6 +30,7 @@
                 super('GameScene');
                 this.tileSize = 45;
                 this.playerSprites = {}; 
+                this.moveDuration = 150; // ms pour traverser une case
             }
 
             preload() {
@@ -132,40 +133,45 @@
 
                     if (direction) {
                         socket.emit('playerMove', direction);
-                        this.moveTimer = time + 150;
+                        this.moveTimer = time + this.moveDuration;
                     }
                 }
             }
 
             createOrUpdatePlayer(player) {
-                const targetX = player.x * this.tileSize + this.tileSize / 2;
-                const targetY = player.y * this.tileSize + this.tileSize / 2;
-                const isLocal = (player.id === socket.id);
+            const targetX = player.x * this.tileSize + this.tileSize / 2;
+            const targetY = player.y * this.tileSize + this.tileSize / 2;
+            const isLocal = (player.id === socket.id);
 
-                if (this.playerSprites[player.id]) {
-                    // Update position if sprite already exists
-                    const sprite = this.playerSprites[player.id];
-                    sprite.x = targetX;
-                    sprite.y = targetY;
+            const sprite = this.playerSprites[player.id];
 
-                    // Update direction texture if provided by server
-                    if (player.direction) {
-                        this.updatePlayerDirection(sprite, player.direction);
-                    }
-
-                } else {
-                    // Create new sprite (using correct key 'flora_front')
-                    const pSprite = this.add.sprite(targetX, targetY, 'flora_front');
-                    pSprite.setDisplaySize(this.tileSize - 10, this.tileSize - 10);
-                    pSprite.setDepth(10); // Ensure player renders above the grid
-
-                    if (isLocal) {
-                        this.localPlayer = pSprite;
-                    }
-
-                    this.playerSprites[player.id] = pSprite;
+            if (sprite) {
+                if (player.direction) {
+                    this.updatePlayerDirection(sprite, player.direction);
                 }
+
+                // Annule le déplacement en cours pour éviter les chevauchements
+                if (sprite.moveTween) sprite.moveTween.stop();
+
+                // Glissement fluide vers la nouvelle case
+                sprite.moveTween = this.tweens.add({
+                    targets: sprite,
+                    x: targetX,
+                    y: targetY,
+                    duration: this.moveDuration,
+                    ease: 'Linear'
+                });
+
+            } else {
+                // Création : le sprite apparaît directement, sans animation
+                const pSprite = this.add.sprite(targetX, targetY, 'flora_front');
+                pSprite.setDisplaySize(this.tileSize - 10, this.tileSize - 10);
+                pSprite.setDepth(10);
+
+                if (isLocal) this.localPlayer = pSprite;
+                this.playerSprites[player.id] = pSprite;
             }
+        }
 
             // Direction helper method
             updatePlayerDirection(sprite, direction) {
