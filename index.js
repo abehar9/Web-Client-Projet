@@ -88,6 +88,17 @@ io.on('connection', (socket) => {
             player.y = newY;
             player.direction = direction;
             player.lastMove = now;
+
+            //checks if touched another player
+            const otherPlayer = Object.values(players).find(
+                (p) => p.id !== player.id && p.alive && p.x === newX && p.y === newY
+            );
+    
+            if (otherPlayer) {
+                handlePlayerDeath(player, io);
+                return;
+            }
+
             io.emit('updatePlayerPosition', player);
         }
     });
@@ -98,7 +109,6 @@ io.on('connection', (socket) => {
         delete players[socket.id];
         io.emit('removePlayer', socket.id);
     });
-
 
     socket.on('placeBomb', () => {
         const player = players[socket.id];
@@ -164,6 +174,17 @@ io.on('connection', (socket) => {
             }
             // --- END: Scan blast & update gameGrid ---
 
+            const flameKeys = new Set(flames.map((f) => `${f.x},${f.y}`));
+            console.log('Blast tiles:', [...flameKeys], 'Players:', Object.values(players).map(p => ({
+                id: p.id, x: p.x, y: p.y, alive: p.alive, lives: p.lives
+            })));
+
+            for (const p of Object.values(players)) {
+                if (p.alive && flameKeys.has(`${p.x},${p.y}`)) {
+                    handlePlayerDeath(p, io);
+                }
+            }
+
             io.emit('bombExploded', {
                 id: key,
                 x: bx,
@@ -175,6 +196,21 @@ io.on('connection', (socket) => {
         }, 3000);
     });
 });
+
+function handlePlayerDeath(player, io) {
+    if (!player || !player.alive) return;
+
+    const died = player.takeDamage(1);
+    console.log(`Player ${player.id} hit! lives=${player.lives}, alive=${player.alive}, died=${died}`);
+
+    if (died) {
+        io.emit('playerDied', { id: player.id, x: player.x, y: player.y });
+        delete players[player.id];
+        io.emit('removePlayer', player.id);
+    } else {
+        io.emit('updatePlayerPosition', player);
+    }
+}
 
 server.listen(8080, () => {
     console.log('Serveur lancé sur http://localhost:8080');
