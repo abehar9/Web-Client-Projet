@@ -1,0 +1,10 @@
+#---FICHIER GITIGNORE---
+
+# Nodes Modules (à réinstaller avec npm)
+nodes_modules/
+
+#Configuration BDD
+.env
+
+#Fichiers parasites --- macOs
+.DS_Store
