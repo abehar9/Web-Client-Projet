@@ -1,7 +1,7 @@
 #---FICHIER GITIGNORE---
 
 # Nodes Modules (à réinstaller avec npm)
-nodes_modules/
+node_modules/
 
 #Configuration BDD
 .env
